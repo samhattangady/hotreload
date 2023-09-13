@@ -5,21 +5,24 @@ application that is already running. We do this by using dynamic libraries
 which are recompiled, and the running application reloads the library.
 
 ## Current Structure
-When the `HOTRELOAD` flag is set to true (in `main.zig`),
+There are two files; `main.zig` and `game.zig`. Both of these files have access
+to the `Game` struct which is in the `game.zig` file.
+
+To implement hot reloading, we compile an executable and a dynamic library.
 `main.zig` is used to create an executable called `reload.exe` 
 and `game.zig` is used to create a dynamic library called `hotreload.dll`.
 
-Both `main.zig` and `game.zig` have access to the same `Game` struct.
-
-The executable loads the dll on startup, and can reload the dll whenever
-the `r` key is pressed.
-
-To reload the dll, we copy it from `zig-out` to another location, in this case
-`libs`, and rename it to avoid file name clashes. This is the dll that we then
-load in.
-
 The dll only exposes the `Game.update` method, so the surface is very
 minimal. 
+
+The executable loads the dll on startup, and can reload the dll whenever
+the `r` key is pressed in the application. After we reload the dll, we update
+the pointer to the `update_game` method.
+
+To load the dll, we copy it from `zig-out` to another location to avoid access
+clashes when we want to rebuild the library.
+We rename the dll to avoid file name clashes. This is the dll that we then
+load in.
 
 When we want to build statically, we can turn off the `HOTRELOAD` flag,
 and the whole project will compile statically. The changes between the two
@@ -51,6 +54,11 @@ obvious issues that I am unaware of in this space.
 - Is hot code swapping planned to release real soon? I think Andrew had streamed about
 it a while ago, but I don't know if there have been any updates on that front.
 
+- What is the best way to handle recompiling and reloading? The current approach involves
+copying the dll file out of `zig-out/bin`. If we use the dll directly from `zig-out`, then
+the next time we try to build the library, the application is already accessing the file, and
+we get an `AccessDenied` error.
+
 - Debugging doesn't work cleanly. I use RemedyBG, and I can attach to the running
 process. But the breakpoints don't get correctly identified. This might be because
 we aren't correctly handling the `.pdb` files, but I am not sure the correct
@@ -64,8 +72,8 @@ directory as the binary.
 ```
 I don't know how to handle this issue, and which of the two attempts should be looked into.
 
-- Adding more fields to the `Game` struct seems like it is a memory unsafe option. It has worked
-a few times, but I think that might just be lucky. 
+- Adding more fields to the Game struct seems like it is not memory safe. It has worked
+a few times, but I think that might just be lucky.
 
 I would like to know if there is a way to
 make that more reliable. The way that I think about it is if I can alloc a large chunk of memory
@@ -84,3 +92,6 @@ I think I am okay waiting for the async feature to arrive in zig.
 
 - The `build.zig` file is ugly, so when we rebuild just the dll, it tries to rebuild the
 executable as well, and fails. This is a smaller issue in the grand scheme.
+
+
+[Discussion on Ziggit](https://ziggit.dev/t/hotreloading-in-zig/1737)
