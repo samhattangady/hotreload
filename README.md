@@ -1,5 +1,7 @@
 # hotreload
 
+Running on zig `0.12.0-dev.25+36c57c3ba`
+
 A project to try out hotreloading in zig. Hotreloading means updating an
 application that is already running. We do this by using dynamic libraries
 which are recompiled, and the running application reloads the library.
