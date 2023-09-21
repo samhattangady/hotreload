@@ -6,7 +6,6 @@ const c = @cImport({
 pub const Game = struct {
     const Self = @This();
     quit: bool = false,
-    should_reload_libs: bool = false,
     allocator: std.mem.Allocator,
     window: *c.SDL_Window,
     renderer: *c.SDL_Renderer,
@@ -46,13 +45,12 @@ pub const Game = struct {
             switch (event.type) {
                 c.SDL_QUIT => self.quit = true,
                 c.SDL_KEYDOWN => {
-                    if (event.key.keysym.sym == c.SDLK_r) self.should_reload_libs = true;
+                    if (event.key.keysym.sym == c.SDLK_r) self.resetState();
                     if (event.key.keysym.sym == c.SDLK_END) self.quit = true;
                 },
                 else => {},
             }
         }
-        if (self.should_reload_libs) self.resetState();
         self.box_x += self.speed_x;
         if (self.box_x + self.box_w > 1280 or self.box_x < 0) self.speed_x *= -1;
         self.box_y += self.speed_y;
@@ -63,7 +61,7 @@ pub const Game = struct {
     fn resetState(self: *Self) void {
         self.box_x = 100;
         self.box_y = 100;
-        self.box_w = 100;
+        self.box_w = 80;
         self.box_h = 80;
         self.speed_x = 0.03;
         self.speed_y = 0.03;
@@ -78,16 +76,12 @@ pub const Game = struct {
             .w = @intFromFloat(self.box_w),
             .h = @intFromFloat(self.box_h),
         };
-        _ = c.SDL_SetRenderDrawColor(self.renderer, 120, 220, 200, 255);
+        _ = c.SDL_SetRenderDrawColor(self.renderer, 120, 120, 200, 255);
         _ = c.SDL_RenderFillRect(self.renderer, &rect);
         _ = c.SDL_RenderPresent(self.renderer);
     }
-
-    fn another(self: *Self) void {
-        std.debug.print("{d}:\t", .{self.counter});
-    }
 };
 
-pub export fn update_game(game: *Game) void {
+pub export fn updateGame(game: *Game) void {
     game.update();
 }

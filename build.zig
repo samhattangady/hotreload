@@ -1,68 +1,52 @@
 const std = @import("std");
 
-// Although this function looks imperative, note that its job is to
-// declaratively construct a build graph that will be executed by an external
-// runner.
-pub fn build(b: *std.Build) void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+pub const BuildMode = enum {
+    /// Build static executable
+    static_exe,
+    /// Build dynamic executable and dynamic library
+    dynamic_exe,
+    /// Build dynamic library
+    hotreload,
+};
 
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    const build_mode = b.option(BuildMode, "build_mode", "Can be static_exe, dynamic_exe or hotreload") orelse .static_exe;
+
+    const build_exe = (build_mode == .static_exe or build_mode == .dynamic_exe);
+    const build_lib = (build_mode == .hotreload or build_mode == .dynamic_exe);
+    const hotreload = build_lib;
+    var options = b.addOptions();
+    options.addOption(bool, "hotreload", hotreload);
 
     const exe = b.addExecutable(.{
         .name = "reload",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
+    exe.addOptions("build_options", options);
     exe.addSystemIncludePath(.{ .path = "C:/SDL2-2.26.5/include" });
     exe.addLibraryPath(.{ .path = "C:/SDL2-2.26.5/lib/x64" });
     exe.linkSystemLibrary("sdl2");
     exe.linkLibC();
-    b.installArtifact(exe);
+    if (build_exe) b.installArtifact(exe);
 
     const lib = b.addSharedLibrary(.{
         .name = "hotreload",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
         .root_source_file = .{ .path = "src/game.zig" },
         .target = target,
         .optimize = optimize,
     });
+    lib.addOptions("build_options", options);
     lib.addSystemIncludePath(.{ .path = "C:/SDL2-2.26.5/include" });
     lib.addLibraryPath(.{ .path = "C:/SDL2-2.26.5/lib/x64" });
     lib.linkSystemLibrary("sdl2");
     lib.linkLibC();
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
-
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
-    const main_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const run_main_tests = b.addRunArtifact(main_tests);
-
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build test`
-    // This will evaluate the `test` step rather than the default, which is "install".
-    const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&run_main_tests.step);
+    if (build_lib) b.installArtifact(lib);
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());

@@ -17,36 +17,33 @@ and `game.zig` is used to create a dynamic library called `hotreload.dll`.
 The dll only exposes the `Game.update` method, so the surface is very
 minimal. 
 
-The executable loads the dll on startup, and can reload the dll whenever
-the `r` key is pressed in the application. After we reload the dll, we update
-the pointer to the `update_game` method.
+On startup, the executable loads up the directory. It then spawns a thread that
+watches the `zig-out/lib` directory. The watcher thread sets a flag when it sees
+any change in the output dir, and the main loop sees that flag, and reloads the
+`dll`, and updates the pointer to the `updateGame` method.
 
 To load the dll, we copy it from `zig-out` to another location to avoid access
 clashes when we want to rebuild the library.
-We rename the dll to avoid file name clashes. This is the dll that we then
-load in.
 
-When we want to build statically, we can turn off the `HOTRELOAD` flag,
+When we want to build statically, we can build with `-Dbuild_mode=static_exe`,
 and the whole project will compile statically. The changes between the two
 modes are minimal. The state for storing dll data in `main.zig` is no longer
 required, and we call `game.update()` directly rather than through the dll.
 
 ## Running the hot code reload
-1. `zig build run` compiles everything and starts the application. You will see a
-rectangle bouncing around the screen.
+1. `zig build run -Dbuild_mode=dynamic_exe` compiles everything and starts 
+the application. You will see a rectangle bouncing around the screen.
 
 2. Make changes to the `game.zig` file - for example, change the
-color of the rectangle in `Game.render` or size and speed in `Game.resetState`.
+color of the rectangle in `Game.render`, or draw more shapes.
 
-3. In a new terminal, run `zig.build`. This will throw an error saying `AccessDenied` to
-`reload.exe`. This can be ignored.
+3. In a new terminal, run `zig build -Dbuild_mode=hotreload`. Once the compilation
+is complete, the running app will automatically load in the new library, and the
+app will hotreload.
 
-4. With the application window focussed, press the `r` key. This reloads the dll, and
-the application will be updated with the changes made in step 2.
+4. `GOTO` step 2.
 
-5. GOTO step 2.
-
-6. Profit?
+5. Profit?
 
 ## Current Issues
 
@@ -61,19 +58,6 @@ copying the dll file out of `zig-out/bin`. If we use the dll directly from `zig-
 the next time we try to build the library, the application is already accessing the file, and
 we get an `AccessDenied` error.
 
-- Debugging doesn't work cleanly. I use RemedyBG, and I can attach to the running
-process. But the breakpoints don't get correctly identified. This might be because
-we aren't correctly handling the `.pdb` files, but I am not sure the correct
-way to do that. 
-
-According to the docs,
-```
-Note that RemedyBG will first try to load the PDB that is specified in the binary's header (PE32+).
-If this cannot be found, then RemedyBG will make a second attempt to load the PDB file in same
-directory as the binary.
-```
-I don't know how to handle this issue, and which of the two attempts should be looked into.
-
 - Adding more fields to the Game struct seems like it is not memory safe. It has worked
 a few times, but I think that might just be lucky.
 
@@ -84,16 +68,5 @@ be in memory that is safe to touch.
 
 Additionally, I think the zig spec does not preserve the ordering of elements in the struct, so
 there may be changes needed there, possibly using `extern struct` or `packed struct`.
-
-- We want to automatically detect when a new dll has been compiled and reload
-it. Ideally, we would do this using `std.fs.Watch`, but that requires `async`
-which is not yet ready in self hosted. I tried to directly call the windows
-API, but didn't get too far.
-
-I think I am okay waiting for the async feature to arrive in zig.
-
-- The `build.zig` file is ugly, so when we rebuild just the dll, it tries to rebuild the
-executable as well, and fails. This is a smaller issue in the grand scheme.
-
 
 [Discussion on Ziggit](https://ziggit.dev/t/hotreloading-in-zig/1737)
